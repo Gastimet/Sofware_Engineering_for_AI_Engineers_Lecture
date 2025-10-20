@@ -1,0 +1,17 @@
+# 1) build
+docker compose build --no-cache api
+
+# 2) mlflow
+docker compose up -d mlflow
+
+# 3) eğitim (ilk tabular verilerinle + Production)
+docker compose run --rm api python -m src.pipeline.train `
+  --task churn `
+  --data-csv-a example_data/source_a.csv `
+  --data-csv-b example_data/source_b.csv `
+  --target churned `
+  --promote
+
+# 4) api & autotrain
+docker compose up -d api autotrain
+irm http://localhost:8000/health
