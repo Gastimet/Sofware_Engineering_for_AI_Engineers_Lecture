@@ -16,6 +16,6 @@ RUN pip install --no-cache-dir -U pip setuptools wheel \
  && pip install --no-cache-dir -r requirements.txt
 
 # proje dosyaları
-COPY . /workspace
+COPY .. /workspace
 
 EXPOSE 8000
