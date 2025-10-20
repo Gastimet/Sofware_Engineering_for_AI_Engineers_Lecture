@@ -30,7 +30,6 @@ META = OnlineMeta(state_path=settings.meta_state_path, n_models=len(settings.mod
 
 
 class PredictRequest(BaseModel):
-    # Özellikler dinamik gelecek. Örnek: {"age": 42, "income": 6000, ...}
     features: Dict[str, Any]
 
 
@@ -53,12 +52,26 @@ def _load_production(name: str):
         return None, None
 
     v = int(latest[0].version)
-    if name.lower().endswith("lgbm"):
-        model = mlflow.lightgbm.load_model(f"models:/{name}/Production")
-    elif name.lower().endswith("cat"):
-        model = mlflow.catboost.load_model(f"models:/{name}/Production")
-    else:
-        model = mlflow.sklearn.load_model(f"models:/{name}/Production")
+    try:
+        if name.lower().endswith("ag"):
+            import mlflow.pyfunc
+            model = mlflow.pyfunc.load_model(f"models:/{name}/Production")
+        elif name.lower().endswith("lgbm"):
+            try:
+                model = mlflow.sklearn.load_model(f"models:/{name}/Production")
+            except Exception:
+                model = mlflow.lightgbm.load_model(f"models:/{name}/Production")
+        elif name.lower().endswith("cat"):
+            model = mlflow.catboost.load_model(f"models:/{name}/Production")
+        else:
+            try:
+                model = mlflow.sklearn.load_model(f"models:/{name}/Production")
+            except Exception:
+                import mlflow.pyfunc
+                model = mlflow.pyfunc.load_model(f"models:/{name}/Production")
+    except Exception:
+        return None, None
+
     return model, v
 
 
@@ -79,9 +92,8 @@ def _poller():
             print("Poller error:", e)
 
 
-# Başlangıçta poller'ı çalıştır ve modelleri yüklemeye çalış
+# İlk yükleme + poller
 threading.Thread(target=_poller, daemon=True).start()
-
 for name in settings.model_names:
     try:
         m, v = _load_production(name)
@@ -113,7 +125,11 @@ def predict(req: PredictRequest):
                 p = float(model.predict_proba(x)[:, 1][0])
             else:
                 pred = model.predict(x)
-                p = float(pred[0])
+                # pyfunc (AutoGluon) predict -> olasılık vektörü/seri olabilir
+                try:
+                    p = float(np.ravel(pred)[0])
+                except Exception:
+                    p = float(pred[0])
             base_probas.append(p)
             base_dict[name] = p
 
@@ -137,7 +153,10 @@ def feedback(req: FeedbackRequest):
                 p = float(model.predict_proba(x)[:, 1][0])
             else:
                 pred = model.predict(x)
-                p = float(pred[0])
+                try:
+                    p = float(np.ravel(pred)[0])
+                except Exception:
+                    p = float(pred[0])
             base_probas.append(p)
 
     if base_probas:
