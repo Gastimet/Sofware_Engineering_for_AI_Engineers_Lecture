@@ -1,18 +1,16 @@
-// Projenizin /PythonProject2/Jenkinsfile yoluna bu dosyayı koyun
-
 pipeline {
     agent any
 
-    // --- YENİ VE ÖNEMLİ BÖLÜM ---
-    // Jenkins'e hangi Docker aracını kullanacağını açıkça belirtir.
-    // İsim, "Global Tool Configuration" sayfasında verdiğiniz isimle
-    // BİREBİR AYNI OLMALIDIR.
+    // --- CORRECTED SYNTAX IS HERE ---
+    // Using 'dockerTool' as you correctly pointed out.
     tools {
         dockerTool 'docker-from-host'
     }
 
     environment {
+        // IMPORTANT: Make sure this matches your folder name in Git.
         PROJECT_DIR       = 'Autogluon_multiple_regression_models'
+
         DOCKER_IMAGE_NAME = 'autogluon-ml-app'
         DOCKER_IMAGE_TAG  = 'latest'
     }
@@ -20,7 +18,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                echo 'Kod, Git reposundan çekiliyor...'
+                echo 'Checking out code from Git...'
                 checkout scm
             }
         }
@@ -28,21 +26,24 @@ pipeline {
         stage('Build and Train') {
             steps {
                 dir(env.PROJECT_DIR) {
+                    script {
+                        echo "Building Docker image..."
+                        // The 'docker' variable is still used here, which is correct.
+                        // The 'tools' block above just sets the environment path.
+                        def dockerImage = docker.build("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}", ".")
 
-                    echo "Dockerfile kullanılarak imaj oluşturuluyor..."
-                    def dockerImage = docker.build("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}", ".")
-
-                    echo 'Model eğitim betiği (train.py) çalıştırılıyor...'
-                    dockerImage.inside {
-                        sh '''
-                        python -m src.pipeline.train \
-                            --task churn \
-                            --data-csv-a example_data/source_a.csv \
-                            --data-csv-b example_data/source_b.csv \
-                            --target churned \
-                            --join-keys customer_id \
-                            --promote
-                        '''
+                        echo 'Starting model training inside the container...'
+                        dockerImage.inside {
+                            sh '''
+                            python -m src.pipeline.train \
+                                --task churn \
+                                --data-csv-a example_data/source_a.csv \
+                                --data-csv-b example_data/source_b.csv \
+                                --target churned \
+                                --join-keys customer_id \
+                                --promote
+                            '''
+                        }
                     }
                 }
             }
@@ -51,7 +52,7 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline tamamlandı.'
+            echo 'Pipeline finished.'
             cleanWs()
         }
     }
