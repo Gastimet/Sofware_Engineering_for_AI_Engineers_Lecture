@@ -10,12 +10,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 
-# pip güncelle + requirements
+# Since build context is parent (..), copy requirements from there
 COPY requirements.txt /workspace/requirements.txt
+
+# pip güncelle + requirements
 RUN pip install --no-cache-dir -U pip setuptools wheel \
  && pip install --no-cache-dir -r requirements.txt
 
-# proje dosyaları
-COPY .. /workspace
+# proje dosyaları (tüm parent directory)
+COPY . /workspace
 
 EXPOSE 8000
