@@ -8,7 +8,7 @@ pipeline {
     // İsim, "Global Tool Configuration" sayfasında verdiğiniz isimle
     // BİREBİR AYNI OLMALIDIR.
     tools {
-        docker 'docker-from-host'
+        dockerTool 'docker-from-host'
     }
 
     environment {
