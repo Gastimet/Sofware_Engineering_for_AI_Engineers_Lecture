@@ -33,16 +33,16 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONUNBUFFERED: "1"
     volumes:
-      - ./:/workspace
+      - ..:/workspace
     working_dir: /workspace
     depends_on:
       mlflow:
         condition: service_healthy
     command: >
-      python -m src.pipeline.train
+      sh -c "cd /workspace && python -m src.pipeline.train
         --task churn
-        --data-csv-a /workspace/example_data/source_a.csv
-        --data-csv-b /workspace/example_data/source_b.csv
+        --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv
+        --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv
         --join-keys customer_id
         --target churned
-        --promote
+        --promote"
