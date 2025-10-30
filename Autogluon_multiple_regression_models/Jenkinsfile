@@ -1,0 +1,70 @@
+// Jenkinsfile
+
+pipeline {
+    // Pipeline'ın herhangi bir uygun Jenkins ajanı üzerinde çalışmasını sağlar.
+    agent any
+
+    // Ortam değişkenleri, Docker imajımıza bir isim verelim.
+    environment {
+        DOCKER_IMAGE_NAME = "autogluon-ml-app"
+        DOCKER_IMAGE_TAG = "latest"
+    }
+
+    stages {
+        // 1. Aşama: Kodu Git'ten Çekme
+        stage('Checkout Code') {
+            steps {
+                echo 'Kod, Git reposundan çekiliyor...'
+                // Bu adım, Jenkins işini oluştururken belirteceğimiz
+                // Git reposundan en son kodu çeker.
+                checkout scm
+            }
+        }
+
+        // 2. Aşama: Docker İmajını Oluşturma
+        stage('Build Docker Image') {
+            steps {
+                echo "Dockerfile kullanılarak imaj oluşturuluyor: ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+                // Projenizin kök dizinindeki Dockerfile'ı kullanarak
+                // Docker imajını build eder.
+                script {
+                    docker.build("${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}", ".")
+                }
+            }
+        }
+
+        // 3. Aşama: Model Eğitme
+        stage('Run Training') {
+            steps {
+                echo 'Model eğitim betiği (train.py) çalıştırılıyor...'
+                // Oluşturduğumuz Docker imajını kullanarak bir konteyner başlatır
+                // ve içinde eğitim komutunu çalıştırırız.
+                // docker.image(...).inside komutu bunu kolaylaştırır.
+                script {
+                    docker.image("${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}").inside {
+                        // train.py betiğini, projedeki örnek verilerle çalıştırıyoruz.
+                        // Bu komut, daemon.py'nin içinde de çağrılan komuttur.
+                        sh '''
+                        python -m src.pipeline.train \
+                            --task churn \
+                            --data-csv-a example_data/source_a.csv \
+                            --data-csv-b example_data/source_b.csv \
+                            --target churned \
+                            --join-keys customer_id \
+                            --promote
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    // Pipeline bittiğinde (başarılı ya da başarısız) her zaman çalışacak bölüm.
+    post {
+        always {
+            echo 'Pipeline tamamlandı.'
+            // İsteğe bağlı: Geçici dosyaları ve konteynerleri temizleyebilirsiniz.
+            cleanWs()
+        }
+    }
+}
