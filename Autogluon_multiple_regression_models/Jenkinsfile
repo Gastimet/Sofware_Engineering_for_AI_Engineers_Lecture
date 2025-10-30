@@ -1,75 +1,46 @@
 pipeline {
     agent any
 
-    environment {
-        PROJECT_DIR        = 'Autogluon_multiple_regression_models'
-        DOCKER_IMAGE_NAME  = 'autogluon-ml-app'
-        DOCKER_IMAGE_TAG   = 'latest'
+    tools {
+        dockerTool 'docker-from-host'
+    }
 
-        // MLflow tracking server bilgileri
-        MLFLOW_PORT        = '5000'
-        MLFLOW_CONTAINER   = 'mlflow-server'
-        MLFLOW_BACKEND_URI = 'sqlite:///mlflow.db'
-        MLFLOW_ARTIFACT_URI = 'file:///mlruns'
+    environment {
+        PROJECT_DIR = 'Autogluon_multiple_regression_models'
+        DOCKER_IMAGE_NAME = 'autogluon-ml-app'
+        DOCKER_IMAGE_TAG  = 'latest'
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
-                echo '📦 Checking out code from Git...'
+                echo '📦 Kod, Git reposundan çekiliyor...'
                 checkout scm
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Start Services & Run Training') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo '🐳 Building Docker image...'
-                        sh "docker build -t ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ."
-                    }
-                }
-            }
-        }
+                        echo "🚀 MLflow servisi docker-compose ile başlatılıyor..."
+                        sh "docker-compose up --build -d mlflow"
 
-        stage('Start MLflow Tracking Server') {
-            steps {
-                script {
-                    echo '🚀 Starting MLflow tracking server...'
-
-                    // Önce varsa eski MLflow container’ı durdur
-                    sh "docker rm -f ${env.MLFLOW_CONTAINER} || true"
-
-                    // MLflow UI + backend başlat
-                    sh """
-                    docker run -d --name ${env.MLFLOW_CONTAINER} \
-                        -p ${env.MLFLOW_PORT}:5000 \
-                        -v \$(pwd)/mlruns:/mlruns \
-                        -v \$(pwd)/mlflow.db:/mlflow.db \
-                        python:3.9-slim \
-                        sh -c "pip install mlflow && mlflow server \
-                        --backend-store-uri ${env.MLFLOW_BACKEND_URI} \
-                        --default-artifact-root ${env.MLFLOW_ARTIFACT_URI} \
-                        --host 0.0.0.0 --port 5000"
-                    """
-
-                    echo "MLflow server is running at: http://localhost:${env.MLFLOW_PORT}"
-                }
-            }
-        }
-
-        stage('Train Model (Logs to MLflow)') {
-            steps {
-                dir(env.PROJECT_DIR) {
-                    script {
-                        echo '🧠 Training model and logging to MLflow...'
-
+                        echo "⌛ MLflow servisinin sağlıklı olması bekleniyor..."
                         sh """
-                        docker run --rm \
-                            -v \$(pwd):/app \
-                            -e MLFLOW_TRACKING_URI=http://host.docker.internal:${env.MLFLOW_PORT} \
-                            ${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} \
+                        sleep 10
+                        docker inspect --format='{{.State.Health.Status}}' mlflow | grep -q 'healthy' || (
+                            echo '⚠️ MLflow henüz sağlıklı değil, 20 saniye bekleniyor...' &&
+                            sleep 20
+                        )
+                        """
+
+                        echo "🏗️ Docker imajı oluşturuluyor..."
+                        def trainingImage = docker.build("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}", ".")
+
+                        echo "🤖 Model eğitimi başlatılıyor..."
+                        trainingImage.inside("--network ${env.PROJECT_DIR}_default") {
+                            sh '''
                             python -m src.pipeline.train \
                                 --task churn \
                                 --data-csv-a example_data/source_a.csv \
@@ -77,7 +48,8 @@ pipeline {
                                 --target churned \
                                 --join-keys customer_id \
                                 --promote
-                        """
+                            '''
+                        }
                     }
                 }
             }
@@ -86,10 +58,15 @@ pipeline {
 
     post {
         always {
-            echo '🧹 Cleaning up workspace...'
-            sh "docker stop ${env.MLFLOW_CONTAINER} || true"
+            dir(env.PROJECT_DIR) {
+                script {
+                    echo "🧹 Tüm servisler docker-compose ile kapatılıyor..."
+                    sleep 5
+                    sh "docker-compose down"
+                }
+            }
+            echo '✅ Pipeline tamamlandı.'
             cleanWs()
-            echo '✅ Pipeline finished.'
         }
     }
 }
