@@ -15,8 +15,8 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./mlruns:/mlruns          # artefaktlar
-      - ./.mlflow:/mlflow         # SQLite DB için KLASÖR
+      - ./mlruns:/mlruns
+      - ./.mlflow:/mlflow
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:5000').read(); sys.exit(0)"]
       interval: 5s
@@ -24,44 +24,25 @@ services:
       retries: 20
       start_period: 10s
 
-  api:
-    build: ..
-    container_name: api
+  trainer:
+    build:
+      context: ..
+      dockerfile: Autogluon_multiple_regression_models/Dockerfile
+    container_name: trainer
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
-      MODEL_NAMES: model_lgbm,model_cat
-      POLL_SECONDS: "30"
-      META_STATE_PATH: /state/meta.pkl
+      PYTHONUNBUFFERED: "1"
     volumes:
       - ./:/workspace
-      - ./state:/state
     working_dir: /workspace
     depends_on:
       mlflow:
         condition: service_healthy
-    ports:
-      - "8000:8000"
-    command: ["uvicorn", "src.server.app:app", "--host", "0.0.0.0", "--port", "8000"]
-
-  autotrain:
-    build: ..
-    container_name: autotrain
-    environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      AUTO_ENABLED: "1"
-      AUTO_WATCH_PATH: /incoming
-      AUTO_A_GLOB: "*_A.csv"        # A dosyası paterni
-      AUTO_B_GLOB: "*_B.csv"        # B dosyası paterni
-      AUTO_TASK: churn
-      AUTO_TARGET: churned
-      AUTO_JOIN_KEYS: customer_id
-      AUTO_PROMOTE: "1"             # eğitince Production’a geçir
-      AUTO_INTERVAL_SECONDS: "30"   # tick süresi
-    volumes:
-      - ./:/workspace
-      - ./incoming:/incoming
-    working_dir: /workspace
-    depends_on:
-      mlflow:
-        condition: service_healthy
-    command: ["python", "-m", "src.autotrain.daemon"]
+    command: >
+      python -m src.pipeline.train
+        --task churn
+        --data-csv-a /workspace/example_data/source_a.csv
+        --data-csv-b /workspace/example_data/source_b.csv
+        --join-keys customer_id
+        --target churned
+        --promote
