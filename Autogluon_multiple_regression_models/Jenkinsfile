@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -13,18 +14,28 @@ pipeline {
             }
         }
 
-        stage('Start Services & Run Training') {
+        stage('Build and Start MLflow') {
             steps {
                 dir('Autogluon_multiple_regression_models') {
                     script {
                         echo '🚀 MLflow servisi docker-compose ile başlatılıyor...'
-                        sh 'docker-compose up -d --build mlflow'
+                        sh 'docker-compose build mlflow'
+                        sh 'docker-compose up -d mlflow'
 
                         echo '⏳ MLflow servisinin hazır olması bekleniyor...'
-                        sh 'sleep 10'
+                        sh 'sleep 15'
+                    }
+                }
+            }
+        }
 
+        stage('Run Training') {
+            steps {
+                dir('Autogluon_multiple_regression_models') {
+                    script {
                         echo '🤖 Model eğitimi başlatılıyor...'
-                        sh 'docker-compose up --build trainer'
+                        sh 'docker-compose build trainer'
+                        sh 'docker-compose run --rm trainer'
 
                         echo '✅ Model eğitimi tamamlandı!'
                     }
@@ -38,7 +49,7 @@ pipeline {
             dir('Autogluon_multiple_regression_models') {
                 script {
                     echo '🧹 Tüm servisler docker-compose ile kapatılıyor...'
-                    sh 'docker-compose down || true'
+                    sh 'docker-compose down -v || true'
                 }
             }
         }
