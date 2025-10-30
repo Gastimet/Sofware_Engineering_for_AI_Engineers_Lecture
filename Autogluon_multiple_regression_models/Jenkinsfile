@@ -6,9 +6,8 @@ pipeline {
     }
 
     environment {
+        // Bu ismin reponuzdaki klasör adıyla aynı olduğundan emin olun.
         PROJECT_DIR = 'Autogluon_multiple_regression_models'
-        DOCKER_IMAGE_NAME = 'autogluon-ml-app'
-        DOCKER_IMAGE_TAG  = 'latest'
     }
 
     stages {
@@ -24,22 +23,25 @@ pipeline {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo "🚀 MLflow servisi docker-compose ile başlatılıyor..."
-                        sh "docker-compose up --build -d mlflow"
+                        // --- DÜZELTME 1: Tire yerine boşluk kullanıldı ---
+                        sh "docker compose up --build -d mlflow"
 
                         echo "⌛ MLflow servisinin sağlıklı olması bekleniyor..."
+                        // Bu bekleme komutu, MLflow'un başlaması için zaman tanır.
                         sh """
-                        sleep 10
+                        sleep 15
                         docker inspect --format='{{.State.Health.Status}}' mlflow | grep -q 'healthy' || (
-                            echo '⚠️ MLflow henüz sağlıklı değil, 20 saniye bekleniyor...' &&
-                            sleep 20
+                            echo '⚠️ MLflow henüz sağlıklı değil, 20 saniye daha bekleniyor...' &&
+                            sleep 20 &&
+                            docker inspect --format='{{.State.Health.Status}}' mlflow | grep -q 'healthy'
                         )
                         """
 
                         echo "🏗️ Docker imajı oluşturuluyor..."
-                        def trainingImage = docker.build("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}", ".")
+                        def trainingImage = docker.build(".", "--network ${env.PROJECT_DIR}_default")
 
                         echo "🤖 Model eğitimi başlatılıyor..."
-                        trainingImage.inside("--network ${env.PROJECT_DIR}_default") {
+                        trainingImage.inside {
                             sh '''
                             python -m src.pipeline.train \
                                 --task churn \
@@ -61,8 +63,8 @@ pipeline {
             dir(env.PROJECT_DIR) {
                 script {
                     echo "🧹 Tüm servisler docker-compose ile kapatılıyor..."
-                    sleep 5
-                    sh "docker-compose down"
+                    // --- DÜZELTME 2: Tire yerine boşluk kullanıldı ---
+                    sh "docker compose down"
                 }
             }
             echo '✅ Pipeline tamamlandı.'
