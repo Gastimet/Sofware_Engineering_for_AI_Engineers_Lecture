@@ -18,8 +18,6 @@ pipeline {
                 dir('Autogluon_multiple_regression_models') {
                     script {
                         echo '🚀 MLflow servisi docker-compose ile başlatılıyor...'
-                        // Fixed: Changed from 'docker compose' to 'docker-compose'
-                        // Fixed: Separated --build flag properly
                         sh 'docker-compose up -d --build mlflow'
 
                         echo '⏳ MLflow servisinin hazır olması bekleniyor...'
@@ -40,7 +38,6 @@ pipeline {
             dir('Autogluon_multiple_regression_models') {
                 script {
                     echo '🧹 Tüm servisler docker-compose ile kapatılıyor...'
-                    // Fixed: Changed from 'docker compose' to 'docker-compose'
                     sh 'docker-compose down || true'
                 }
             }
