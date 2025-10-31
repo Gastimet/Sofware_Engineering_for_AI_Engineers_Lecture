@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                echo '📦 Kod, Git reposundan çekiliyor...'
+                echo 'Git reposundan çekiliyor...'
                 checkout scm
             }
         }
@@ -18,11 +18,11 @@ pipeline {
             steps {
                 dir('Autogluon_multiple_regression_models') {
                     script {
-                        echo '🚀 MLflow servisi docker-compose ile başlatılıyor...'
+                        echo 'MLflow servisi docker-compose ile başlatılıyor'
                         sh 'docker-compose build mlflow'
                         sh 'docker-compose up -d mlflow'
 
-                        echo '⏳ MLflow servisinin hazır olması bekleniyor...'
+                        echo '⏳ MLflow servisinin hazır olması bekleniyor'
                         sh 'sleep 15'
                     }
                 }
@@ -33,11 +33,11 @@ pipeline {
             steps {
                 dir('Autogluon_multiple_regression_models') {
                     script {
-                        echo '🤖 Model eğitimi başlatılıyor...'
+                        echo 'Model eğitimi başlatılıyor'
                         sh 'docker-compose build trainer'
                         sh 'docker-compose run --rm trainer'
 
-                        echo '✅ Model eğitimi tamamlandı!'
+                        echo 'Model eğitimi tamamlandı!'
                     }
                 }
             }
@@ -48,16 +48,16 @@ pipeline {
         always {
             dir('Autogluon_multiple_regression_models') {
                 script {
-                    echo '🧹 Tüm servisler docker-compose ile kapatılıyor...'
+                    echo 'Tüm servisler docker-compose ile kapatılıyor'
                     sh 'docker-compose down -v || true'
                 }
             }
         }
         success {
-            echo '✅ Pipeline başarıyla tamamlandı!'
+            echo 'Pipeline başarıyla tamamlandı!'
         }
         failure {
-            echo '❌ Pipeline başarısız oldu!'
+            echo 'Pipeline başarısız oldu!'
         }
     }
 }
