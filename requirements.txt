@@ -1,0 +1,23 @@
+# Core ML frameworks
+autogluon.tabular==1.1.1
+lightgbm==4.3.0
+catboost==1.2.5
+
+# MLflow and experiment tracking
+mlflow==2.16.0
+
+# Data processing
+pandas==2.2.2
+polars==0.20.0
+numpy==1.26.4
+
+# ML utilities
+scikit-learn==1.5.0
+
+# API (if needed)
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.6.0
+
+# Other utilities
+python-multipart==0.0.6
