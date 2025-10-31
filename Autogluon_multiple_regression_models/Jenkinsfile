@@ -33,11 +33,19 @@ pipeline {
                         // try...finally bloğu, eğitim başarısız olsa bile
                         // 'finally' içindeki temizlik adımının çalışmasını garantiler.
                         try {
+                            echo "🐍 Gerekli araçlar (pip ve docker-compose) kuruluyor..."
+                            // Jenkins konteyneri root olarak çalıştığı için 'sudo' gerekmez.
+                            // Önce Linux paket yöneticisini güncelliyoruz.
+                            sh "apt-get update"
+                            // Python'un paket yöneticisi olan 'pip'i kuruyoruz.
+                            sh "apt-get install -y python3-pip"
+                            // pip kullanarak 'docker-compose' aracını kuruyoruz.
+                            sh "pip3 install docker-compose"
+
                             echo "🚀 MLflow servisi başlatılıyor..."
-                            // DÜZELTME: 'docker-compose' yerine modern 'docker compose'
-                            // (boşluklu) komutunu kullanıyoruz. Bu, Jenkins'in
-                            // 'command not found' hatası vermesini engeller.
-                            sh "docker compose up --build -d mlflow"
+                            // DÜZELTME: Artık kurduğumuz 'docker-compose' (tireli)
+                            // komutunu güvenle kullanabiliriz.
+                            sh "docker-compose up --build -d mlflow"
 
                             echo "⌛ MLflow'un sağlıklı olması bekleniyor..."
                             // MLflow'un healthcheck'inin başarılı olmasını bekliyoruz.
@@ -75,9 +83,9 @@ pipeline {
                         } finally {
                             // 6. Temizlik Adımı: Her durumda çalışır
                             echo "🧹 Tüm servisler kapatılıyor..."
-                            // DÜZELTME: 'docker-compose' yerine 'docker compose'
-                            // ve tüm verileri silmek için '--volumes' eklendi.
-                            sh "docker compose down --volumes"
+                            // DÜZELTME: 'docker-compose' (tireli) komutunu
+                            // ve tüm verileri silmek için '--volumes' kullanıyoruz.
+                            sh "docker-compose down --volumes"
                         }
                     }
                 }
@@ -100,3 +108,4 @@ pipeline {
         }
     }
 }
+
