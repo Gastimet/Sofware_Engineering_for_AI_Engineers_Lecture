@@ -1,63 +1,102 @@
-
 pipeline {
+    // 1. Ajan: Herhangi bir uygun Jenkins ajanı
     agent any
 
+    // 2. Araçlar: Jenkins ayarlarındaki 'docker-from-host' isimli
+    //    Docker aracını kullanacağımızı belirtiyoruz.
     tools {
-        git 'Default'
+        dockerTool 'docker-from-host'
+    }
+
+    // 3. Ortam Değişkenleri: Proje klasörümüzün adını tanımlıyoruz.
+    environment {
+        // !!! ÖNEMLİ: Bu ismi kendi reponuzdaki klasör adıyla değiştirin.
+        PROJECT_DIR = 'Autogluon_multiple_regression_models'
     }
 
     stages {
+        // 4. Aşama: Kodu Git'ten Çekme
         stage('Checkout Code') {
             steps {
-                echo 'Git reposundan çekiliyor...'
+                echo '📦 Kod, Git reposundan çekiliyor...'
                 checkout scm
             }
         }
 
-        stage('Build and Start MLflow') {
+        // 5. Aşama: ML Pipeline'ını Çalıştırma
+        // Bu aşama, servisleri başlatır, eğitimi çalıştırır ve temizler.
+        stage('Run ML Pipeline') {
             steps {
-                dir('Autogluon_multiple_regression_models') {
+                // Proje klasörünün içine giriyoruz
+                dir(env.PROJECT_DIR) {
                     script {
-                        echo 'MLflow servisi docker-compose ile başlatılıyor'
-                        sh 'docker-compose build mlflow'
-                        sh 'docker-compose up -d mlflow'
+                        // try...finally bloğu, eğitim başarısız olsa bile
+                        // 'finally' içindeki temizlik adımının çalışmasını garantiler.
+                        try {
+                            echo "🚀 MLflow servisi başlatılıyor..."
+                            // DÜZELTME: 'docker-compose' yerine modern 'docker compose'
+                            // (boşluklu) komutunu kullanıyoruz. Bu, Jenkins'in
+                            // 'command not found' hatası vermesini engeller.
+                            sh "docker compose up --build -d mlflow"
 
-                        echo '⏳ MLflow servisinin hazır olması bekleniyor'
-                        sh 'sleep 15'
-                    }
-                }
-            }
-        }
+                            echo "⌛ MLflow'un sağlıklı olması bekleniyor..."
+                            // MLflow'un healthcheck'inin başarılı olmasını bekliyoruz.
+                            sh """
+                            sleep 15
+                            docker inspect --format='{{.State.Health.Status}}' mlflow | grep -q 'healthy' || (
+                                echo '⚠️ MLflow henüz sağlıklı değil, 20 saniye daha bekleniyor...' &&
+                                sleep 20 &&
+                                docker inspect --format='{{.State.Health.Status}}' mlflow | grep -q 'healthy'
+                            )
+                            """
 
-        stage('Run Training') {
-            steps {
-                dir('Autogluon_multiple_regression_models') {
-                    script {
-                        echo 'Model eğitimi başlatılıyor'
-                        sh 'docker-compose build trainer'
-                        sh 'docker-compose run --rm trainer'
+                            echo "🤖 Model eğitimi başlatılıyor..."
+                            // DÜZELTME: 'docker-compose run' yerine Jenkins'in kendi
+                            // docker komutunu kullanıyoruz. Bu, 'Network recreate'
+                            // hatasını tamamen çözer.
+                            docker.image('python:3.11-slim').inside("--network ${env.PROJECT_DIR}_default") {
+                                // Bu blok, 'python:3.11-slim' imajında çalışır
+                                // ve 'mlflow' konteynerine erişebilir.
 
-                        echo 'Model eğitimi tamamlandı!'
+                                echo "🐍 Gerekli Python kütüphaneleri kuruluyor..."
+                                sh "pip install --no-cache-dir -r requirements.txt"
+
+                                echo "👟 Eğitim betiği çalıştırılıyor..."
+                                sh '''
+                                python -m src.pipeline.train \
+                                    --task churn \
+                                    --data-csv-a example_data/source_a.csv \
+                                    --data-csv-b example_data/source_b.csv \
+                                    --target churned \
+                                    --join-keys customer_id \
+                                    --promote
+                                '''
+                            }
+                        } finally {
+                            // 6. Temizlik Adımı: Her durumda çalışır
+                            echo "🧹 Tüm servisler kapatılıyor..."
+                            // DÜZELTME: 'docker-compose' yerine 'docker compose'
+                            // ve tüm verileri silmek için '--volumes' eklendi.
+                            sh "docker compose down --volumes"
+                        }
                     }
                 }
             }
         }
     }
 
+    // 7. Post: Pipeline bittikten sonra yapılacaklar
     post {
         always {
-            dir('Autogluon_multiple_regression_models') {
-                script {
-                    echo 'Tüm servisler docker-compose ile kapatılıyor'
-                    sh 'docker-compose down -v || true'
-                }
-            }
+            echo '✅ Pipeline tamamlandı.'
+            // Jenkins çalışma alanını temizle
+            cleanWs()
         }
         success {
-            echo 'Pipeline başarıyla tamamlandı!'
+            echo '🎉 Pipeline başarıyla tamamlandı!'
         }
         failure {
-            echo 'Pipeline başarısız oldu!'
+            echo '❌ Pipeline başarısız oldu!'
         }
     }
 }
