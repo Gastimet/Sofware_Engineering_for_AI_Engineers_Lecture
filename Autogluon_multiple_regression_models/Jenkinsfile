@@ -36,8 +36,8 @@ pipeline {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo '🤖 Model eğitimi başlatılıyor...' /* add --no-cache if you want to*/
-                        sh 'docker-compose build trainer'
+                        echo '🤖 Model eğitimi başlatılıyor...'
+                        sh 'docker-compose build --no-cache trainer'
                         sh 'docker-compose run --rm trainer'
 
                         echo '✅ Model eğitimi tamamlandı!'
