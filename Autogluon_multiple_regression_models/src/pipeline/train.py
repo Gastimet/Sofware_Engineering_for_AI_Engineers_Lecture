@@ -138,7 +138,7 @@ def main():
                     "autogluon.tabular==1.1.1",
                     "numpy==1.26.4",
                     "pandas==2.2.2",
-                    "scikit-learn==1.5.0",
+                    "scikit-learn==1.4.0",
                     "lightgbm==4.3.0",
                 ],
             )
