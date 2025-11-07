@@ -37,7 +37,7 @@ pipeline {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🤖 Model eğitimi başlatılıyor...'
-                        sh 'docker-compose build trainer'
+                        sh 'docker-compose build --no-cache trainer'
                         sh 'docker-compose run --rm trainer'
 
                         echo '✅ Model eğitimi tamamlandı!'
