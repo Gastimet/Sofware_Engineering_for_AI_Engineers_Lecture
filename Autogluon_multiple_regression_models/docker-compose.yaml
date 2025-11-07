@@ -39,7 +39,7 @@ services:
       mlflow:
         condition: service_healthy
     command: >
-      sh -c "cd /workspace && python -m src.pipeline.train
+      sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train
         --task churn
         --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv
         --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv
