@@ -13,7 +13,7 @@ numpy==1.26.4
 
 # ML utilities
 # autogluon ile uyumluluk için scikit-learn versiyonu düşürüldü.
-scikit-learn==1.4.0
+scikit-learn==1.5.0
 
 # API (if needed)
 fastapi==0.109.0
