@@ -38,33 +38,12 @@ services:
     depends_on:
       mlflow:
         condition: service_healthy
+    # FIX: Removed extra folder layer from cd command and removed duplicate trainer block
     command: >
-      sh -c "cd /workspace/Sofware_Engineering_for_AI_Engineers_Lecture/Autogluon_multiple_regression_models && python -m src.pipeline.train
+      sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train
         --task churn
         --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv
         --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv
-        --join-keys customer_id
-        --target churned
-        --promote"
-  trainer:
-    build:
-      context: ..
-      dockerfile: Autogluon_multiple_regression_models/Dockerfile
-    container_name: trainer
-    environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-      PYTHONUNBUFFERED: "1"
-    volumes:
-      - ..:/workspace
-    working_dir: /workspace
-    depends_on:
-      mlflow:
-        condition: service_healthy
-    command: >
-      sh -c "cd /workspace/Sofware_Engineering_for_AI_Engineers_Lecture/Autogluon_multiple_regression_models && python -m src.pipeline.train
-        --task churn
-        --data-csv-a /workspace/Sofware_Engineering_for_AI_Engineers_Lecture/Autogluon_multiple_regression_models/example_data/source_a.csv
-        --data-csv-b /workspace/Sofware_Engineering_for_AI_Engineers_Lecture/Autogluon_multiple_regression_models/example_data/source_b.csv
         --join-keys customer_id
         --target churned
         --promote"
