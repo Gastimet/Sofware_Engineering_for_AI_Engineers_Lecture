@@ -38,7 +38,7 @@ services:
     depends_on:
       mlflow:
         condition: service_healthy
-    # FIX: Removed extra folder layer from cd command and removed duplicate trainer block
+    # FIX: Corrected path to /workspace/Autogluon_multiple_regression_models
     command: >
       sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train
         --task churn

@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        git 'Default'
-    }
-
     environment {
         PROJECT_DIR = 'Autogluon_multiple_regression_models'
     }
@@ -22,8 +18,9 @@ pipeline {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🚀 MLflow servisi docker-compose ile başlatılıyor...'
-                        sh 'docker-compose build mlflow || true'
-                        sh 'docker-compose up -d mlflow'
+                        // FIX: Changed 'docker-compose' to 'docker compose'
+                        sh 'docker compose build mlflow || true'
+                        sh 'docker compose up -d mlflow'
 
                         echo '⏳ MLflow servisinin hazır olması bekleniyor...'
                         sh 'sleep 20'
@@ -37,9 +34,9 @@ pipeline {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🤖 Model eğitimi başlatılıyor...'
-                        sh 'docker-compose build --no-cache trainer'
-                        sh 'docker-compose run --rm trainer'
-
+                        // FIX: Changed 'docker-compose' to 'docker compose'
+                        sh 'docker compose build --no-cache trainer'
+                        sh 'docker compose run --rm trainer'
                         echo '✅ Model eğitimi tamamlandı!'
                     }
                 }
@@ -52,7 +49,8 @@ pipeline {
             dir(env.PROJECT_DIR) {
                 script {
                     echo '🧹 Tüm servisler docker-compose ile kapatılıyor...'
-                    sh 'docker-compose down -v || true'
+                    // FIX: Changed 'docker-compose' to 'docker compose'
+                    sh 'docker compose down -v || true'
                 }
             }
             echo '✅ Pipeline tamamlandı.'
