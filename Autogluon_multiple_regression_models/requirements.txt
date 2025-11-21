@@ -27,3 +27,5 @@ python-multipart==0.0.6
 evidently == 0.4.18
 bandit==1.7.8
 safety==3.1.0
+modelscan==0.8.1
+cyclonedx-bom==5.1.1
