@@ -71,7 +71,7 @@ def main():
     y_np = df[args.target].cast(pl.Int64).to_numpy()
     y = pd.Series(y_np, name=args.target).astype("int64", copy=True)
 
-    # FIX: Removed 'strict=False' because Polars 0.20.0 does not support it.
+    # FIX: Removed 'strict=False' compatibility issue
     X = df.drop(join_keys + [args.target]).to_pandas(use_pyarrow_extension_array=False).copy()
 
     # ---------- LightGBM ----------
@@ -129,27 +129,25 @@ def main():
         except Exception:
             pass
 
-        # pyfunc olarak logla ve kaydet
-        with tempfile.TemporaryDirectory() as td:
-            save_dir = os.path.join(td, "ag_model")
-            predictor.save(save_dir)
-            mlflow.pyfunc.log_model(
-                artifact_path="model",
-                python_model=AGPyfunc(),
-                artifacts={"predictor": save_dir},
-                pip_requirements=[
-                    "autogluon.tabular==1.1.1",
-                    "numpy==1.26.4",
-                    "pandas==2.2.2",
-                    "scikit-learn==1.4.0",
-                    "lightgbm==4.3.0",
-                ],
-            )
-            result = mlflow.register_model(
-                model_uri=f"runs:/{mlflow.active_run().info.run_id}/model",
-                name="model_ag",
-            )
-            v_ag = int(result.version)
+        # FIX: Removed tempfile usage. We now point MLflow directly to the
+        # path where AutoGluon successfully saved the model during training.
+        mlflow.pyfunc.log_model(
+            artifact_path="model",
+            python_model=AGPyfunc(),
+            artifacts={"predictor": predictor.path},
+            pip_requirements=[
+                "autogluon.tabular==1.1.1",
+                "numpy==1.26.4",
+                "pandas==2.2.2",
+                "scikit-learn==1.4.0",
+                "lightgbm==4.3.0",
+            ],
+        )
+        result = mlflow.register_model(
+            model_uri=f"runs:/{mlflow.active_run().info.run_id}/model",
+            name="model_ag",
+        )
+        v_ag = int(result.version)
 
     print("LightGBM:", m1)
     print("CatBoost:", m2)
