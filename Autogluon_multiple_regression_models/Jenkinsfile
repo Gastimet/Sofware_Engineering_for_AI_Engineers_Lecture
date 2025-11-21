@@ -13,6 +13,21 @@ pipeline {
             }
         }
 
+        stage('Security Scan') {
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        echo '🔒 Starting Security Scans...'
+                        // Run scans inside a temporary python container to avoid messing up the host
+                        // We mount the current directory to /app so the tools can see the code
+                        sh 'docker run --rm -v $(pwd):/app -w /app python:3.11-slim sh -c "pip install bandit safety && safety check && bandit -r src"'
+                    }
+                }
+            }
+        }
+
+
+
         stage('Build and Start MLflow') {
             steps {
                 dir(env.PROJECT_DIR) {
