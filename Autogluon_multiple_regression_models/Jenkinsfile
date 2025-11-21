@@ -13,32 +13,71 @@ pipeline {
             }
         }
 
-        stage('Supply Chain Security (SBOM)') {
+        // STAGE 1: Build the image FIRST.
+        // This ensures all tools (cyclonedx, safety, modelscan) and code are inside the container.
+        // We don't need volume mounts after this.
+        stage('Build Trainer Image') {
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        echo '🔨 Docker imajı inşa ediliyor (Security tools dahil)...'
+                        // We build the 'trainer' service defined in docker-compose.yaml
+                        sh 'docker compose build --no-cache trainer'
+                    }
+                }
+            }
+        }
+
+        // STAGE 2: Supply Chain Security (SBOM)
+        // We run the tool INSIDE the container we just built.
+        stage('Generate SBOM') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '📜 Software Bill of Materials (SBOM) oluşturuluyor...'
-                        // We run this in a temp container so we don't need tools installed on the host
-                        // "cyclonedx-py" reads the requirements.txt and outputs a standard JSON inventory
-                        sh 'docker run --rm -v $(pwd):/app -w /app python:3.11-slim sh -c "pip install cyclonedx-bom && cyclonedx-py requirements requirements.txt -o sbom.json"'
 
-                        // Archive the SBOM so it can be downloaded from Jenkins UI
+                        // Explanation:
+                        // run --rm: Remove container after run
+                        // -T: Disable pseudo-tty (needed to pipe output > properly)
+                        // --entrypoint: Override the default python command to run cyclonedx-py
+                        // /tmp/requirements.txt: The file path inside the image (defined in Dockerfile)
+                        sh 'docker compose run --rm -T --entrypoint "cyclonedx-py" trainer requirements /tmp/requirements.txt -o - > sbom.json'
+
                         archiveArtifacts artifacts: 'sbom.json', fingerprint: true
                     }
                 }
             }
         }
 
-        stage('Build and Start MLflow') {
+        // STAGE 3: Static Analysis (SAST)
+        stage('Security Scan (SAST)') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo '🚀 MLflow servisi docker-compose ile başlatılıyor...'
-                        sh 'docker compose build mlflow || true'
-                        sh 'docker compose up -d mlflow'
+                        echo '🔒 Güvenlik taramaları yapılıyor (Safety & Bandit)...'
 
-                        echo '⏳ MLflow servisinin hazır olması bekleniyor...'
-                        sh 'sleep 20'
+                        // We run bash commands inside the container to check dependencies and code
+                        // 'safety check': checks installed packages against vulns
+                        // 'bandit -r src': checks python code for security flaws
+                        try {
+                            sh 'docker compose run --rm -T --entrypoint "sh" trainer -c "safety check && bandit -r src"'
+                        } catch (Exception e) {
+                            echo '⚠️ Security scan found issues but continuing pipeline for demo purposes...'
+                            // Uncomment the next line to fail the build on security issues
+                            // error("Security scan failed")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Start MLflow') {
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        echo '🚀 MLflow servisi başlatılıyor...'
+                        sh 'docker compose up -d mlflow'
+                        sh 'sleep 15'
                     }
                 }
             }
@@ -49,8 +88,6 @@ pipeline {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🤖 Model eğitimi başlatılıyor...'
-                        // Rebuild ensures the new requirements (modelscan) are inside the image
-                        sh 'docker compose build --no-cache trainer'
                         sh 'docker compose run --rm trainer'
                         echo '✅ Model eğitimi tamamlandı!'
                     }
@@ -58,17 +95,15 @@ pipeline {
             }
         }
 
+        // STAGE 4: Model Security Scan
         stage('Model Security Scan') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo '🛡️ Eğitilen modellerde güvenlik taraması yapılıyor (ModelScan)...'
+                        echo '🛡️ ModelScan ile Pickle/Serialization taraması...'
 
-                        // We run modelscan INSIDE the trainer container context.
-                        // Why? Because the models are stored in the 'mlruns' volume/directory
-                        // which the trainer container has direct access to.
-                        // Flag -p /mlruns tells it to scan that folder recursively.
-                        sh 'docker compose run --rm trainer modelscan -p /mlruns'
+                        // Scans the /mlruns folder (mounted volume) for malicious models
+                        sh 'docker compose run --rm --entrypoint "modelscan" trainer -p /mlruns'
                     }
                 }
             }
@@ -79,18 +114,11 @@ pipeline {
         always {
             dir(env.PROJECT_DIR) {
                 script {
-                    echo '🧹 Tüm servisler docker-compose ile kapatılıyor...'
+                    echo '🧹 Temizlik yapılıyor...'
                     sh 'docker compose down -v || true'
                 }
             }
-            echo '✅ Pipeline tamamlandı.'
             cleanWs()
-        }
-        success {
-            echo '🎉 Pipeline başarıyla tamamlandı!'
-        }
-        failure {
-            echo '❌ Pipeline başarısız oldu!'
         }
     }
 }
