@@ -3,13 +3,14 @@ services:
     image: python:3.11-slim
     container_name: mlflow
     working_dir: /app
+    # Installs dependencies and starts server in one command
     command: sh -c "pip install --no-cache-dir mlflow==2.16.0 gunicorn==21.2.0 && mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root file:/mlruns --host 0.0.0.0 --port 5000"
-
     ports:
       - "5000:5000"
+    # FIX: Changed to named volumes to avoid host-path issues in Jenkins
     volumes:
-      - ./mlruns:/mlruns
-      - ./.mlflow:/mlflow
+      - mlruns_data:/mlruns
+      - mlflow_data:/mlflow
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:5000').read(); sys.exit(0)"]
       interval: 5s
@@ -25,11 +26,15 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONUNBUFFERED: "1"
-    volumes:
-      - ..:/workspace
+    # FIX: Removed 'volumes' section completely.
+    # The code is already in the image (via Dockerfile COPY), so we don't need to mount it.
     working_dir: /workspace
     depends_on:
       mlflow:
         condition: service_healthy
-    # FIX: Command flattened to a single line to prevent shell parsing errors
     command: sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train --task churn --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv --join-keys customer_id --target churned --promote"
+
+# Define the named volumes
+volumes:
+  mlflow_data:
+  mlruns_data:
