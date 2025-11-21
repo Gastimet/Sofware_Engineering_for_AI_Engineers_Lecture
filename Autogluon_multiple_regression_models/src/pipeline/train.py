@@ -32,6 +32,7 @@ def parse_args():
 
 class AGPyfunc(mlflow.pyfunc.PythonModel):
     """AutoGluon TabularPredictor'ü pyfunc olarak sarar; predict() olasılık döndürür."""
+
     def load_context(self, context):
         from autogluon.tabular import TabularPredictor
         self.predictor = TabularPredictor.load(context.artifacts["predictor"])
@@ -69,7 +70,9 @@ def main():
     assert args.target in df.columns, f"Target {args.target} not found"
     y_np = df[args.target].cast(pl.Int64).to_numpy()
     y = pd.Series(y_np, name=args.target).astype("int64", copy=True)
-    X = df.drop(join_keys + [args.target], strict=False).to_pandas(use_pyarrow_extension_array=False).copy()
+
+    # FIX: Removed 'strict=False' because Polars 0.20.0 does not support it.
+    X = df.drop(join_keys + [args.target]).to_pandas(use_pyarrow_extension_array=False).copy()
 
     # ---------- LightGBM ----------
     with mlflow.start_run(run_name="lightgbm"):
@@ -108,10 +111,10 @@ def main():
             train_data=train_df,
             presets="medium_quality_faster_train",
             hyperparameters={
-                "GBM": {},   # LightGBM
-                "RF": {},    # RandomForest
-                "XT": {},    # ExtraTrees
-                "KNN": {},   # hızlı seçenekler
+                "GBM": {},  # LightGBM
+                "RF": {},  # RandomForest
+                "XT": {},  # ExtraTrees
+                "KNN": {},  # hızlı seçenekler
                 # ağır olanlar kapalı: "CAT": {}, "XGB": {}, "NN_TORCH": {}
             },
             verbosity=2,
@@ -122,7 +125,7 @@ def main():
             from sklearn.metrics import log_loss
             p = predictor.predict_proba(X)
             pp = p[1].values if 1 in p.columns else p.iloc[:, -1].values
-            mlflow.log_metric("logloss", float(log_loss(y, np.clip(pp, 1e-6, 1-1e-6), labels=[0, 1])))
+            mlflow.log_metric("logloss", float(log_loss(y, np.clip(pp, 1e-6, 1 - 1e-6), labels=[0, 1])))
         except Exception:
             pass
 
@@ -155,9 +158,12 @@ def main():
     if args.promote:
         from mlflow.tracking import MlflowClient
         client = MlflowClient()
-        client.transition_model_version_stage(name="model_lgbm", version=v_lgbm, stage="Production", archive_existing_versions=True)
-        client.transition_model_version_stage(name="model_cat", version=v_cat, stage="Production", archive_existing_versions=True)
-        client.transition_model_version_stage(name="model_ag", version=v_ag, stage="Production", archive_existing_versions=True)
+        client.transition_model_version_stage(name="model_lgbm", version=v_lgbm, stage="Production",
+                                              archive_existing_versions=True)
+        client.transition_model_version_stage(name="model_cat", version=v_cat, stage="Production",
+                                              archive_existing_versions=True)
+        client.transition_model_version_stage(name="model_ag", version=v_ag, stage="Production",
+                                              archive_existing_versions=True)
         print("Promoted to Production:", f"model_lgbm v{v_lgbm}, model_cat v{v_cat}, model_ag v{v_ag}")
 
 
