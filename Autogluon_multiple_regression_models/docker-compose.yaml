@@ -7,7 +7,6 @@ services:
     command: sh -c "pip install --no-cache-dir mlflow==2.16.0 gunicorn==21.2.0 && mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root file:/mlruns --host 0.0.0.0 --port 5000"
     ports:
       - "5000:5000"
-    # FIX: Changed to named volumes to avoid host-path issues in Jenkins
     volumes:
       - mlruns_data:/mlruns
       - mlflow_data:/mlflow
@@ -26,8 +25,10 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONUNBUFFERED: "1"
-    # FIX: Removed 'volumes' section completely.
-    # The code is already in the image (via Dockerfile COPY), so we don't need to mount it.
+    # --- FIX: Mount the volume here too ---
+    # This ensures the trainer writes models to the same place MLflow reads them
+    volumes:
+      - mlruns_data:/mlruns
     working_dir: /workspace
     depends_on:
       mlflow:
