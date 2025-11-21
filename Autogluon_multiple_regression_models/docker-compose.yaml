@@ -38,12 +38,5 @@ services:
     depends_on:
       mlflow:
         condition: service_healthy
-    # FIX: Corrected path to /workspace/Autogluon_multiple_regression_models
-    command: >
-      sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train
-        --task churn
-        --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv
-        --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv
-        --join-keys customer_id
-        --target churned
-        --promote"
+    # FIX: Command flattened to a single line to prevent shell parsing errors
+    command: sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train --task churn --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv --join-keys customer_id --target churned --promote"
