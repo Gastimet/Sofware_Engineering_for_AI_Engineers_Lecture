@@ -71,7 +71,8 @@ def main():
     y_np = df[args.target].cast(pl.Int64).to_numpy()
     y = pd.Series(y_np, name=args.target).astype("int64", copy=True)
 
-    # FIX: Removed 'strict=False' compatibility issue
+    # KEEP: Removed 'strict=False' here because that was a bug fix for Polars version,
+    # not a security feature we need to revert.
     X = df.drop(join_keys + [args.target]).to_pandas(use_pyarrow_extension_array=False).copy()
 
     # ---------- LightGBM ----------
@@ -129,8 +130,8 @@ def main():
         except Exception:
             pass
 
-        # FIX: Removed tempfile usage. We now point MLflow directly to the
-        # path where AutoGluon successfully saved the model during training.
+        # Keep: Using predictor.path instead of tempfile is a stability fix, not strictly security.
+        # This prevents the [Errno 2] error you saw earlier.
         mlflow.pyfunc.log_model(
             artifact_path="model",
             python_model=AGPyfunc(),
