@@ -13,7 +13,7 @@ pipeline {
             }
         }
 
-        // STAGE 1: Build the image with Garak installed
+        // STAGE 1: Build the image
         stage('Build Trainer Image') {
             steps {
                 dir(env.PROJECT_DIR) {
@@ -25,19 +25,17 @@ pipeline {
             }
         }
 
-        // STAGE 2: Garak Integration (Proof of Concept)
-        stage('Garak LLM Scanner') {
+        // STAGE 2: Garak LLM Vulnerability Scan
+        // This runs Garak in "test mode" to satisfy the assignment requirement
+        // without needing a real LLM connected.
+        stage('LLM Vulnerability Scan (Garak)') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo 'uwu Garak Vulnerability Scanner çalıştırılıyor...'
-                        // We use the 'test.Blank' model and probe to demonstrate integration
-                        // without requiring a real LLM connection yet.
-                        // This proves the tool is installed and the pipeline works.
-                        sh 'docker compose run --rm -T --entrypoint "python" trainer -m garak -m test.Blank -p test.Blank --report_prefix garak_report'
+                        echo '🕵️ Garak LLM Vulnerability Scanner çalıştırılıyor...'
 
-                        // Optional: Archive the report so you can show your professor
-                        // archiveArtifacts artifacts: 'garak_report.jsonl', fingerprint: true
+                        // Using test.Blank generator/probes to prove integration works
+                        sh 'docker compose run --rm -T --entrypoint "python" trainer -m garak --model_type test.Blank --probes test.Blank --report_prefix garak_report'
                     }
                 }
             }
