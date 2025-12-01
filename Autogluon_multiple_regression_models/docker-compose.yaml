@@ -1,14 +1,11 @@
 services:
   mlflow:
-    # FIX: Use the same build context as trainer.
-    # This uses the image we just built, which already has mlflow installed.
-    # No more 'pip install' at runtime means no timeouts!
     build:
       context: ..
       dockerfile: Autogluon_multiple_regression_models/Dockerfile
     container_name: mlflow
+    user: root  # <--- ADD THIS LINE
     working_dir: /app
-    # Command is now just starting the server (dependencies are already in the image)
     command: sh -c "mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root file:/mlruns --host 0.0.0.0 --port 5000"
     ports:
       - "5000:5000"
@@ -16,7 +13,7 @@ services:
       - mlruns_data:/mlruns
       - mlflow_data:/mlflow
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:5000').read(); sys.exit(0)"]
+      test: [ "CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:5000').read(); sys.exit(0)" ]
       interval: 5s
       timeout: 5s
       retries: 20
