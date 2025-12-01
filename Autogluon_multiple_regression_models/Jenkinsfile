@@ -26,14 +26,11 @@ pipeline {
         }
 
         // STAGE 2: Garak LLM Vulnerability Scan
-        // This runs Garak in "test mode" to satisfy the assignment requirement
-        // without needing a real LLM connected.
         stage('LLM Vulnerability Scan (Garak)') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🕵️ Garak LLM Vulnerability Scanner çalıştırılıyor...'
-
                         // Using test.Blank generator/probes to prove integration works
                         sh 'docker compose run --rm -T --entrypoint "python" trainer -m garak --model_type test.Blank --probes test.Blank --report_prefix garak_report'
                     }
@@ -53,13 +50,28 @@ pipeline {
             }
         }
 
+        // STAGE 3: Run Training (Fixed Permission Error)
         stage('Run Training') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🤖 Model eğitimi başlatılıyor...'
-                        sh 'docker compose run --rm trainer'
+                        // FIX: Added "-u root" to give permission to write to /mlruns volume
+                        sh 'docker compose run --rm -u root trainer'
                         echo '✅ Model eğitimi tamamlandı!'
+                    }
+                }
+            }
+        }
+
+        // STAGE 4: Model Security Scan
+        stage('Model Security Scan') {
+            steps {
+                dir(env.PROJECT_DIR) {
+                    script {
+                        echo '🛡️ ModelScan ile Pickle/Serialization taraması...'
+                        // Also run as root here just in case it needs read access that was restricted
+                        sh 'docker compose run --rm -u root --entrypoint "modelscan" trainer -p /mlruns'
                     }
                 }
             }
