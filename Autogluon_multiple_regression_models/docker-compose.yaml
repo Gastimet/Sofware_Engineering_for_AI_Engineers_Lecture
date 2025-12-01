@@ -1,10 +1,15 @@
 services:
   mlflow:
-    image: python:3.11-slim
+    # FIX: Use the same build context as trainer.
+    # This uses the image we just built, which already has mlflow installed.
+    # No more 'pip install' at runtime means no timeouts!
+    build:
+      context: ..
+      dockerfile: Autogluon_multiple_regression_models/Dockerfile
     container_name: mlflow
     working_dir: /app
-    # Installs dependencies and starts server in one command
-    command: sh -c "pip install --no-cache-dir mlflow==2.16.0 gunicorn==21.2.0 && mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root file:/mlruns --host 0.0.0.0 --port 5000"
+    # Command is now just starting the server (dependencies are already in the image)
+    command: sh -c "mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root file:/mlruns --host 0.0.0.0 --port 5000"
     ports:
       - "5000:5000"
     volumes:
@@ -25,8 +30,6 @@ services:
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       PYTHONUNBUFFERED: "1"
-    # --- FIX: Mount the volume here too ---
-    # This ensures the trainer writes models to the same place MLflow reads them
     volumes:
       - mlruns_data:/mlruns
     working_dir: /workspace
@@ -35,7 +38,6 @@ services:
         condition: service_healthy
     command: sh -c "cd /workspace/Autogluon_multiple_regression_models && python -m src.pipeline.train --task churn --data-csv-a /workspace/Autogluon_multiple_regression_models/example_data/source_a.csv --data-csv-b /workspace/Autogluon_multiple_regression_models/example_data/source_b.csv --join-keys customer_id --target churned --promote"
 
-# Define the named volumes
 volumes:
   mlflow_data:
   mlruns_data:
