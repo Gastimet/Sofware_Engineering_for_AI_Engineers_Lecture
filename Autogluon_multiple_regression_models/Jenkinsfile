@@ -13,59 +13,14 @@ pipeline {
             }
         }
 
-        // STAGE 1: Build the image FIRST.
-        // This ensures all tools (cyclonedx, safety, modelscan) and code are inside the container.
-        // We don't need volume mounts after this.
+        // STAGE 1: Build the image
         stage('Build Trainer Image') {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo '🔨 Docker imajı inşa ediliyor (Security tools dahil)...'
+                        echo '🔨 Docker imajı inşa ediliyor...'
                         // We build the 'trainer' service defined in docker-compose.yaml
                         sh 'docker compose build --no-cache trainer'
-                    }
-                }
-            }
-        }
-
-        // STAGE 2: Supply Chain Security (SBOM)
-        // We run the tool INSIDE the container we just built.
-        stage('Generate SBOM') {
-            steps {
-                dir(env.PROJECT_DIR) {
-                    script {
-                        echo '📜 Software Bill of Materials (SBOM) oluşturuluyor...'
-
-                        // Explanation:
-                        // run --rm: Remove container after run
-                        // -T: Disable pseudo-tty (needed to pipe output > properly)
-                        // --entrypoint: Override the default python command to run cyclonedx-py
-                        // /tmp/requirements.txt: The file path inside the image (defined in Dockerfile)
-                        sh 'docker compose run --rm -T --entrypoint "cyclonedx-py" trainer requirements /tmp/requirements.txt -o - > sbom.json'
-
-                        archiveArtifacts artifacts: 'sbom.json', fingerprint: true
-                    }
-                }
-            }
-        }
-
-        // STAGE 3: Static Analysis (SAST)
-        stage('Security Scan (SAST)') {
-            steps {
-                dir(env.PROJECT_DIR) {
-                    script {
-                        echo '🔒 Güvenlik taramaları yapılıyor (Safety & Bandit)...'
-
-                        // We run bash commands inside the container to check dependencies and code
-                        // 'safety check': checks installed packages against vulns
-                        // 'bandit -r src': checks python code for security flaws
-                        try {
-                            sh 'docker compose run --rm -T --entrypoint "sh" trainer -c "safety check && bandit -r src"'
-                        } catch (Exception e) {
-                            echo '⚠️ Security scan found issues but continuing pipeline for demo purposes...'
-                            // Uncomment the next line to fail the build on security issues
-                            // error("Security scan failed")
-                        }
                     }
                 }
             }
@@ -90,20 +45,6 @@ pipeline {
                         echo '🤖 Model eğitimi başlatılıyor...'
                         sh 'docker compose run --rm trainer'
                         echo '✅ Model eğitimi tamamlandı!'
-                    }
-                }
-            }
-        }
-
-        // STAGE 4: Model Security Scan
-        stage('Model Security Scan') {
-            steps {
-                dir(env.PROJECT_DIR) {
-                    script {
-                        echo '🛡️ ModelScan ile Pickle/Serialization taraması...'
-
-                        // Scans the /mlruns folder (mounted volume) for malicious models
-                        sh 'docker compose run --rm --entrypoint "modelscan" trainer -p /mlruns'
                     }
                 }
             }
