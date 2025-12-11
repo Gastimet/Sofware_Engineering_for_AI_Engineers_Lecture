@@ -2,14 +2,14 @@ pipeline {
     agent any
 
     environment {
-        // Proje dizini (Git reposundaki klasör adı)
+        // Proje dizini
         PROJECT_DIR = 'Autogluon_multiple_regression_models'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                // Kodu Git'ten çek
+                echo '📦 Kod, Git reposundan çekiliyor...'
                 checkout scm
             }
         }
@@ -17,9 +17,12 @@ pipeline {
         stage('Build Trainer Image') {
             steps {
                 dir(env.PROJECT_DIR) {
-                    echo '🔨 Docker imajı inşa ediliyor...'
-                    // --no-cache kullanarak temiz kurulum yapıyoruz
-                    sh 'docker compose build --no-cache trainer'
+                    script {
+                        echo '🔨 Docker imajı inşa ediliyor (Cache kullanılarak)...'
+                        // HIZLANDIRMA: "--no-cache" parametresi kaldırıldı.
+                        // Artık kütüphaneler tekrar tekrar indirilmeyecek.
+                        sh 'docker compose build trainer'
+                    }
                 }
             }
         }
@@ -27,9 +30,10 @@ pipeline {
         stage('LLM Vulnerability Scan (Garak)') {
             steps {
                 dir(env.PROJECT_DIR) {
-                    echo '🕵️ Garak LLM Vulnerability Scanner çalıştırılıyor...'
-                    // Garak taramasını başlat (Trainer imajı üzerinden)
-                    sh 'docker compose run --rm -T --no-deps --entrypoint python trainer -m garak --model_type test.Blank --probes test.Blank --report_prefix garak_report'
+                    script {
+                        echo '🕵️ Garak LLM Vulnerability Scanner çalıştırılıyor...'
+                        sh 'docker compose run --rm -T --no-deps --entrypoint "python" trainer -m garak --model_type test.Blank --probes test.Blank --report_prefix garak_report'
+                    }
                 }
             }
         }
@@ -37,10 +41,11 @@ pipeline {
         stage('Start MLflow') {
             steps {
                 dir(env.PROJECT_DIR) {
-                    echo '🚀 MLflow servisi başlatılıyor...'
-                    sh 'docker compose up -d mlflow'
-                    // Servisin tam ayağa kalkması için kısa bir bekleme süresi
-                    sleep 15
+                    script {
+                        echo '🚀 MLflow servisi başlatılıyor...'
+                        sh 'docker compose up -d mlflow'
+                        sh 'sleep 15'
+                    }
                 }
             }
         }
@@ -48,13 +53,11 @@ pipeline {
         stage('Run Training & Fairness Check') {
             steps {
                 dir(env.PROJECT_DIR) {
-                    echo '🤖 Model eğitimi ve Fairlearn analizi başlatılıyor...'
-
-                    // KRİTİK GÜNCELLEME: "-u root"
-                    // MLflow SQLite veritabanına yazma izni sorunu yaşamamak için
-                    // container'ı root yetkisiyle çalıştırıyoruz.
-                    // Fairlearn analizi de train.py içinde çalışacağı için burada ekstra bir komuta gerek yok.
-                    sh 'docker compose run --rm -u root trainer'
+                    script {
+                        echo '🤖 Model eğitimi ve Fairlearn analizi başlatılıyor...'
+                        sh 'docker compose run --rm -u root trainer'
+                        echo '✅ Model eğitimi tamamlandı!'
+                    }
                 }
             }
         }
@@ -62,11 +65,11 @@ pipeline {
         stage('Giskard Quality Scan') {
             steps {
                 dir(env.PROJECT_DIR) {
-                    echo '🕵️ Giskard güvenlik ve kalite taraması yapılıyor...'
-
-                    // Giskard test scriptini çalıştırıyoruz.
-                    // Bu dosyanın (src/tests/giskard_scan.py) projede oluşturulduğunu varsayıyoruz.
-                    sh 'docker compose run --rm -u root --entrypoint python trainer src/tests/giskard_scan.py'
+                    script {
+                        echo '🕵️ Giskard güvenlik ve kalite taraması yapılıyor...'
+                        // DÜZELTME: Dosya yolu "Autogluon_multiple_regression_models/" ile başlatıldı.
+                        sh 'docker compose run --rm -u root --entrypoint python trainer Autogluon_multiple_regression_models/src/tests/giskard_scan.py'
+                    }
                 }
             }
         }
@@ -75,10 +78,12 @@ pipeline {
     post {
         always {
             dir(env.PROJECT_DIR) {
-                echo '🧹 Temizlik yapılıyor...'
-                // Konteynerları ve volume'leri temizle
-                sh 'docker compose down -v'
+                script {
+                    echo '🧹 Temizlik yapılıyor...'
+                    sh 'docker compose down -v || true'
+                }
             }
+            cleanWs()
         }
     }
 }

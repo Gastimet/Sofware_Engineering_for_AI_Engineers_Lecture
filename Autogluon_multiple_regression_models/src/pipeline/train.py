@@ -140,11 +140,7 @@ def main():
             )
 
             # Selection Rate (Hangi oranda 1 deniliyor)
-            sel_rate = selection_rate(
-                y_true=y,
-                y_pred=y_pred,
-                sensitive_features=sensitive_features_binary
-            )
+            sel_rate = selection_rate(y_true=y, y_pred=y_pred)
 
             print(f"Fairness (Demographic Parity Diff): {dp_diff}")
 
