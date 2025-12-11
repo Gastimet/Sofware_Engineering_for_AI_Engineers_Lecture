@@ -18,6 +18,7 @@ from .trainers import train_lightgbm, train_catboost
 from ..data.connectors import CSVConnector
 from ..data.merge import join_many
 
+from fairlearn.metrics import demographic_parity_difference, selection_rate
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -75,6 +76,9 @@ def main():
     # not a security feature we need to revert.
     X = df.drop(join_keys + [args.target]).to_pandas(use_pyarrow_extension_array=False).copy()
 
+    sensitive_features = df.select("age").to_pandas()["age"]
+    sensitive_features_binary = (sensitive_features > 30).astype(int)  # 0: Genç, 1: Yaşlı
+
     # ---------- LightGBM ----------
     with mlflow.start_run(run_name="lightgbm"):
         mlflow.sklearn.autolog(log_models=True)
@@ -100,7 +104,7 @@ def main():
         v_cat = int(result.version)
 
     # ---------- AutoGluon (pyfunc) ----------
-    with mlflow.start_run(run_name="autogluon"):
+    with mlflow.start_run(run_name="autogluon") as run:
         from autogluon.tabular import TabularPredictor
 
         train_df = pd.concat([X, y], axis=1)
@@ -120,6 +124,43 @@ def main():
             },
             verbosity=2,
         )
+
+        # --- FAIRLEARN ENTEGRASYONU BAŞLANGICI ---
+        print("Calculating Fairness Metrics...")
+        try:
+            # Tahminleri al
+            y_pred = predictor.predict(X)
+
+            # Demographic Parity Difference hesapla
+            # (İki grup arasındaki pozitif tahmin oranının farkı)
+            dp_diff = demographic_parity_difference(
+                y_true=y,
+                y_pred=y_pred,
+                sensitive_features=sensitive_features_binary
+            )
+
+            # Selection Rate (Hangi oranda 1 deniliyor)
+            sel_rate = selection_rate(
+                y_true=y,
+                y_pred=y_pred,
+                sensitive_features=sensitive_features_binary
+            )
+
+            print(f"Fairness (Demographic Parity Diff): {dp_diff}")
+
+            # Metrikleri MLflow'a kaydet
+            mlflow.log_metric("fairness_dp_diff", dp_diff)
+            mlflow.log_metric("fairness_selection_rate", sel_rate)
+
+            # Eğer fark çok yüksekse (örn > 0.1), bir uyarı tag'i ekle
+            if dp_diff > 0.1:
+                mlflow.set_tag("fairness_check", "WARNING: High Bias Detected")
+            else:
+                mlflow.set_tag("fairness_check", "PASS")
+
+        except Exception as e:
+            print(f"Fairness calculation failed: {e}")
+        # --- FAIRLEARN ENTEGRASYONU BİTİŞİ ---
 
         # basit metrik (train üstünde logloss)
         try:
