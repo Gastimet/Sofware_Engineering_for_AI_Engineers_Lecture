@@ -17,7 +17,7 @@ scikit-learn==1.4.0
 fairlearn==0.10.0
 giskard==2.14.0
 # credoai-lens açık kaynak versiyonu (Governance için)
-credoai-lens==1.0.3
+credoai-lens
 # -----------------------
 
 # API (if needed)
