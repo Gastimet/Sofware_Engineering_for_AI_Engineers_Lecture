@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // Proje dizini
         PROJECT_DIR = 'Autogluon_multiple_regression_models'
     }
 
@@ -18,9 +17,9 @@ pipeline {
             steps {
                 dir(env.PROJECT_DIR) {
                     script {
-                        echo '🔨 Docker imajı inşa ediliyor (Cache kullanılarak)...'
-                        // HIZLANDIRMA: "--no-cache" parametresi kaldırıldı.
-                        // Artık kütüphaneler tekrar tekrar indirilmeyecek.
+                        echo '🔨 Docker imajı inşa ediliyor...'
+                        // HIZLANDIRMA: --no-cache parametresi KALDIRILDI.
+                        // Artık değişiklik yoksa build işlemi saniyeler sürecek.
                         sh 'docker compose build trainer'
                     }
                 }
@@ -56,7 +55,6 @@ pipeline {
                     script {
                         echo '🤖 Model eğitimi ve Fairlearn analizi başlatılıyor...'
                         sh 'docker compose run --rm -u root trainer'
-                        echo '✅ Model eğitimi tamamlandı!'
                     }
                 }
             }
@@ -67,7 +65,8 @@ pipeline {
                 dir(env.PROJECT_DIR) {
                     script {
                         echo '🕵️ Giskard güvenlik ve kalite taraması yapılıyor...'
-                        // DÜZELTME: Dosya yolu "Autogluon_multiple_regression_models/" ile başlatıldı.
+                        // DÜZELTME: Dosya yolunun başına klasör adı eklendi.
+                        // Konteyner içinde path: /workspace/Autogluon_multiple_regression_models/src/...
                         sh 'docker compose run --rm -u root --entrypoint python trainer Autogluon_multiple_regression_models/src/tests/giskard_scan.py'
                     }
                 }

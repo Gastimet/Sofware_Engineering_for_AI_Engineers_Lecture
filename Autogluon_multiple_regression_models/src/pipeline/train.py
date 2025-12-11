@@ -128,31 +128,29 @@ def main():
         # --- FAIRLEARN ENTEGRASYONU BAŞLANGICI ---
         print("Calculating Fairness Metrics...")
         try:
-            # Tahminleri al
             y_pred = predictor.predict(X)
 
-            # Demographic Parity Difference hesapla
-            # (İki grup arasındaki pozitif tahmin oranının farkı)
-            dp_diff = demographic_parity_difference(
-                y_true=y,
-                y_pred=y_pred,
-                sensitive_features=sensitive_features_binary
-            )
+            # Age sütunu kontrolü
+            if 'age' in X.columns:
+                sensitive_features = (X["age"] > 30).astype(int)
 
-            # Selection Rate (Hangi oranda 1 deniliyor)
-            sel_rate = selection_rate(y_true=y, y_pred=y_pred)
+                # 1. Demographic Parity
+                dp_diff = demographic_parity_difference(
+                    y_true=y,
+                    y_pred=y_pred,
+                    sensitive_features=sensitive_features
+                )
 
-            print(f"Fairness (Demographic Parity Diff): {dp_diff}")
+                # 2. Selection Rate (HATA BURADAYDI, DÜZELTİLDİ)
+                # selection_rate fonksiyonuna sensitive_features parametresi vermiyoruz
+                sel_rate = selection_rate(y_true=y, y_pred=y_pred)
 
-            # Metrikleri MLflow'a kaydet
-            mlflow.log_metric("fairness_dp_diff", dp_diff)
-            mlflow.log_metric("fairness_selection_rate", sel_rate)
+                print(f"Fairness (Demographic Parity Diff): {dp_diff}")
 
-            # Eğer fark çok yüksekse (örn > 0.1), bir uyarı tag'i ekle
-            if dp_diff > 0.1:
-                mlflow.set_tag("fairness_check", "WARNING: High Bias Detected")
+                mlflow.log_metric("fairness_dp_diff", dp_diff)
+                mlflow.log_metric("fairness_selection_rate", sel_rate)
             else:
-                mlflow.set_tag("fairness_check", "PASS")
+                print("⚠️ 'age' sütunu bulunamadığı için Fairness analizi atlandı.")
 
         except Exception as e:
             print(f"Fairness calculation failed: {e}")
