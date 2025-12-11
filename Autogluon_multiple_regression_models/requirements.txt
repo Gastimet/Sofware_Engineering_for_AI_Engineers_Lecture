@@ -13,12 +13,14 @@ numpy==1.26.4
 
 # ML utilities
 scikit-learn==1.4.0
-# --- YENİ EKLENENLER ---
-fairlearn==0.10.0
+
+# --- FIX: Pin griffe to 0.48.0 to prevent Giskard incompatibility ---
+griffe==0.48.0
+# -------------------------------------------------------------------
+
+fairlearn
 giskard==2.14.0
-# credoai-lens açık kaynak versiyonu (Governance için)
 credoai-lens
-# -----------------------
 
 # API (if needed)
 fastapi==0.109.0
